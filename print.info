@@ -2,3 +2,9 @@ name = "Printer-friendly pages"
 description = "Adds a printer-friendly version link to content and administrative pages."
 core=6.x
 package = "Printer, email and PDF versions"
+
+; Information added by Drupal 6 LTS vendors on 2018-10-03
+version = "6.x-1.20"
+core = "6.x"
+project = "print"
+datestamp = "1538602398"
