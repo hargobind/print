@@ -395,7 +395,7 @@ function _print_pdf_wkhtmltopdf($print, $html, $filename = NULL) {
   }
 
   // Prevent options that could result in execution of arbitrary commands.
-  $wkhtmltopdf_options = escapeshellcmd($wkhtmltopdf_options);
+  $print_pdf_wkhtmltopdf_options = escapeshellcmd($print_pdf_wkhtmltopdf_options);
 
   $version = _print_pdf_wkhtmltopdf_version();
 
