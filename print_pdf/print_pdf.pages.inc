@@ -116,6 +116,9 @@ function print_pdf_generate_html($print, $html, $filename = NULL) {
   if (basename($print_pdf_pdf_tool) == 'dompdf_config.inc.php') {
     return _print_pdf_dompdf($print, $html, $filename);
   }
+  else if (basename($print_pdf_pdf_tool) == 'Dompdf.php') {
+    return _print_pdf_dompdf($print, $html, $filename);
+  }
   elseif (basename($print_pdf_pdf_tool) == 'tcpdf.php') {
     return _print_pdf_tcpdf($print, $html, $filename);
   }
@@ -181,26 +184,61 @@ function _print_pdf_file_access_images($html) {
  * @see print_pdf_controller()
  */
 function _print_pdf_dompdf($print, $html, $filename = NULL) {
+  $version = _print_pdf_dompdf_version();
   $print_pdf_pdf_tool = variable_get('print_pdf_pdf_tool', PRINT_PDF_PDF_TOOL_DEFAULT);
   $print_pdf_paper_size = variable_get('print_pdf_paper_size', PRINT_PDF_PAPER_SIZE_DEFAULT);
   $print_pdf_page_orientation = variable_get('print_pdf_page_orientation', PRINT_PDF_PAGE_ORIENTATION_DEFAULT);
   $print_pdf_content_disposition = variable_get('print_pdf_content_disposition', PRINT_PDF_CONTENT_DISPOSITION_DEFAULT);
+  $unicode = variable_get('print_pdf_dompdf_unicode', PRINT_PDF_DOMPDF_UNICODE_DEFAULT);
+  $font_subsetting = variable_get('print_pdf_dompdf_font_subsetting', PRINT_PDF_DOMPDF_FONT_SUBSETTING_DEFAULT);
+  $font_cache = file_directory_path() . '/' . PRINT_PDF_DOMPDF_CACHE_DIR_DEFAULT . '/fonts/';
 
-  if (variable_get('print_pdf_autoconfig', PRINT_PDF_AUTOCONFIG_DEFAULT)) {
-    if (!defined('DOMPDF_ENABLE_PHP')) define("DOMPDF_ENABLE_PHP", FALSE);
-    if (!defined('DOMPDF_ENABLE_REMOTE')) define("DOMPDF_ENABLE_REMOTE", TRUE);
-    if (!defined('DOMPDF_TEMP_DIR')) define("DOMPDF_TEMP_DIR", file_directory_temp());
-    if (!defined('DOMPDF_UNICODE_ENABLED')) define("DOMPDF_UNICODE_ENABLED", variable_get('print_pdf_dompdf_unicode', PRINT_PDF_DOMPDF_UNICODE_DEFAULT));
-    if (!defined('DOMPDF_FONT_CACHE')) define("DOMPDF_FONT_CACHE", file_directory_path() . '/' . PRINT_PDF_DOMPDF_CACHE_DIR_DEFAULT . '/fonts/');
+  if (basename($print_pdf_pdf_tool) == 'dompdf_config.inc.php') {
+    // Version of dompdf is < 0.7.
+    if (variable_get('print_pdf_autoconfig', PRINT_PDF_AUTOCONFIG_DEFAULT)) {
+      if (!defined('DOMPDF_ENABLE_PHP')) define("DOMPDF_ENABLE_PHP", FALSE);
+      if (!defined('DOMPDF_ENABLE_REMOTE')) define("DOMPDF_ENABLE_REMOTE", TRUE);
+      if (!defined('DOMPDF_TEMP_DIR')) define("DOMPDF_TEMP_DIR", file_directory_temp());
+      if (!defined('DOMPDF_UNICODE_ENABLED')) define("DOMPDF_UNICODE_ENABLED", $unicode);
+      if (!defined('DOMPDF_ENABLE_FONTSUBSETTING')) define("DOMPDF_ENABLE_FONTSUBSETTING", $font_subsetting);
+      if (!defined('DOMPDF_FONT_CACHE')) define("DOMPDF_FONT_CACHE", $font_cache);
+    }
+
+    require_once($print_pdf_pdf_tool);
+    if (function_exists('spl_autoload_register')) {
+      spl_autoload_register('DOMPDF_autoload');
+      // Earlier dompdf versions could generate xml errors. Tell libxml to
+      // hide them.
+      libxml_use_internal_errors(TRUE);
+      $dompdf = new DOMPDF();
+    }
   }
+  else {
+    // Version of dompdf is >= 0.7.
+    $tool_path = dirname($print_pdf_pdf_tool) . '/../autoload.inc.php';
+    if (file_exists($tool_path)) {
+      require_once $tool_path;
+    }
+    else {
+      watchdog('print_pdf', 'Configured PDF tool does not exist at path: %path', array('%path' => $tool_path), WATCHDOG_ERROR);
+      throw new Exception("Configured PDF tool does not exist, unable to generate PDF.");
+    }
 
-  require_once($print_pdf_pdf_tool);
-  if (function_exists('spl_autoload_register')) {
-    spl_autoload_register('DOMPDF_autoload');
+    $dompdf = new \Dompdf\Dompdf();
+    $unicode = TRUE;
+
+    $dompdf->set_option('enable_php', FALSE);
+    $dompdf->set_option('enable_remote', TRUE);
+    $dompdf->set_option('temp_dir', file_directory_temp());
+    $dompdf->set_option('enable_font_subsetting', $font_subsetting);
+    $dompdf->set_option('font_cache', $font_cache);
   }
 
   // Try to use local file access for image files
   $html = _print_pdf_file_access_images($html);
+
+  // Remove all scripts due to security concerns.
+  $html = preg_replace('!<script(.*?)>(.*?)</script>!is', '', $html);
 
   // Spaces in img URLs must be replaced with %20
   $pattern = '!<(img\s[^>]*?)>!is';
@@ -215,7 +253,6 @@ function _print_pdf_dompdf($print, $html, $filename = NULL) {
   $host = $url_array['host'];
   $path = dirname($url_array['path']) .'/';
 
-  $dompdf = new DOMPDF();
   $dompdf->set_base_path($path);
   $dompdf->set_host($host);
   $dompdf->set_paper(drupal_strtolower($print_pdf_paper_size), $print_pdf_page_orientation);
@@ -225,25 +262,25 @@ function _print_pdf_dompdf($print, $html, $filename = NULL) {
 //  $html = theme('print_pdf_dompdf_footer', $html);
 
   // If dompdf Unicode support is disabled, try to convert to ISO-8859-1 and then to HTML entities
-  if (!variable_get('print_pdf_dompdf_unicode', PRINT_PDF_DOMPDF_UNICODE_DEFAULT)) {
-  // Convert the euro sign to an HTML entity
-  $html = str_replace('€', '&#0128;', $html);
+  if (!$unicode) {
+    // Convert the euro sign to an HTML entity
+    $html = str_replace('€', '&#0128;', $html);
 
-  // Convert from UTF-8 to ISO 8859-1 and then to HTML entities
-  if (function_exists('utf8_decode')) {
-    $html = utf8_decode($html);
-  }
-// iconv fails silently when it encounters something that it doesn't know, so don't use it
-//  else if (function_exists('iconv')) {
-//    $html = iconv('UTF-8', 'ISO-8859-1', $html);
-//  }
-  elseif (function_exists('mb_convert_encoding')) {
-    $html = mb_convert_encoding($html, 'ISO-8859-1', 'UTF-8');
-  }
-  elseif (function_exists('recode_string')) {
-    $html = recode_string('UTF-8..ISO_8859-1', $html);
-  }
-  $html = htmlspecialchars_decode(htmlentities($html, ENT_NOQUOTES, 'ISO-8859-1'), ENT_NOQUOTES);
+    // Convert from UTF-8 to ISO 8859-1 and then to HTML entities
+    if (function_exists('utf8_decode')) {
+      $html = utf8_decode($html);
+    }
+  // iconv fails silently when it encounters something that it doesn't know, so don't use it
+  //  else if (function_exists('iconv')) {
+  //    $html = iconv('UTF-8', 'ISO-8859-1', $html);
+  //  }
+    elseif (function_exists('mb_convert_encoding')) {
+      $html = mb_convert_encoding($html, 'ISO-8859-1', 'UTF-8');
+    }
+    elseif (function_exists('recode_string')) {
+      $html = recode_string('UTF-8..ISO_8859-1', $html);
+    }
+    $html = htmlspecialchars_decode(htmlentities($html, ENT_NOQUOTES, 'ISO-8859-1'), ENT_NOQUOTES);
   }
   else {
     // Otherwise, ensure the content is properly formatted Unicode.

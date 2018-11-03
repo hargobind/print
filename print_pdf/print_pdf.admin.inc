@@ -185,7 +185,8 @@ function print_pdf_settings() {
       '#type' => 'checkbox',
       '#title' => t('Auto-configure the PDF tool settings'),
       '#default_value' => variable_get('print_pdf_autoconfig', PRINT_PDF_AUTOCONFIG_DEFAULT),
-      '#description' => t('If you disable this option, the pdf tool settings must be configured manually. For TCDPF, edit the tcpdf/config/tcpdf_config.php file. For dompdf, edit the dompdf/dompdf_config.inc.php file.'),
+      '#description' => t('If you disable this option, the pdf tool settings must be configured manually. For TCDPF, edit the tcpdf/config/tcpdf_config.php file. For dompdf 0.6.2 and lower, edit the dompdf/dompdf_config.inc.php file.')
+        . ' ' . t('For dompdf 0.7 and higher, this option has no effect.'),
     );
     $form['settings']['print_pdf_font_family'] = array(
       '#type' => 'textfield',
@@ -208,13 +209,14 @@ function print_pdf_settings() {
       '#type' => 'checkbox',
       '#title' => t('Enable font subsetting'),
       '#default_value' => variable_get('print_pdf_font_subsetting', PRINT_PDF_FONT_SUBSETTING_DEFAULT),
-      '#description' => t('(TCPDF only) Only embed those font characters that are actually used.  This can generates smaller PDF files but may significantly slow down processing.'),
+      '#description' => t('(TCPDF and dompdf only) Only embed those font characters that are actually used.  This can generates smaller PDF files but may significantly slow down processing.'),
     );
     $form['settings']['print_pdf_dompdf_unicode'] = array(
       '#type' => 'checkbox',
       '#title' => t("Use dompdf's Unicode Mode"),
       '#default_value' => variable_get('print_pdf_dompdf_unicode', PRINT_PDF_DOMPDF_UNICODE_DEFAULT),
-      '#description' => t("If enabled, dompdf's Unicode mode is used. If not, the module will attempt to convert some non-ASCII chars to ISO-8859-1."),
+      '#description' => t("If enabled, dompdf's Unicode mode is used. If not, the module will attempt to convert some non-ASCII chars to ISO-8859-1.")
+        . ' ' . t('For dompdf 0.7 and higher, this option is always turned on.'),
     );
     $form['settings']['print_pdf_wkhtmltopdf_options'] = array(
       '#type' => 'textfield',
@@ -282,14 +284,14 @@ function _print_pdf_settings_validate($form, &$form_state) {
  *   array of filenames with the include-able PHP file of the located tools
  */
 function _print_pdf_tools() {
-  $tools = array_keys(file_scan_directory(drupal_get_path('module', 'print'), '^dompdf_config.inc.php$'));
+  $tools = array_keys(file_scan_directory(drupal_get_path('module', 'print'), '^(dompdf_config.inc.php|Dompdf.php)$'));
   $tools = array_merge($tools, array_keys(file_scan_directory(drupal_get_path('module', 'print'), '^tcpdf.php$')));
   $tools = array_merge($tools, array_keys(file_scan_directory(drupal_get_path('module', 'print'), '^wkhtmltopdf')));
   $tools = array_merge($tools, array_keys(file_scan_directory(PRINT_PDF_LIB_PATH, '^dompdf_config.inc.php$')));
   $tools = array_merge($tools, array_keys(file_scan_directory(PRINT_PDF_LIB_PATH, '^tcpdf.php$')));
   $tools = array_merge($tools, array_keys(file_scan_directory(PRINT_PDF_LIB_PATH, '^wkhtmltopdf')));
   if (module_exists('libraries')) {
-    $tools = array_merge($tools, array_keys(file_scan_directory(libraries_get_path('dompdf'), '^dompdf_config.inc.php$')));
+    $tools = array_merge($tools, array_keys(file_scan_directory(libraries_get_path('dompdf'), '^(dompdf_config.inc.php|Dompdf.php)$')));
     $tools = array_merge($tools, array_keys(file_scan_directory(libraries_get_path('tcpdf'), '^tcpdf.php$')));
     $tools = array_merge($tools, array_keys(file_scan_directory(libraries_get_path('wkhtmltopdf'), '^wkhtmltopdf')));
   }

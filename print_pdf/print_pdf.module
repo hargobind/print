@@ -91,6 +91,9 @@ function print_pdf_init() {
     if (basename($print_pdf_pdf_tool) == 'dompdf_config.inc.php') {
       $pdf_dirs[] = PRINT_PDF_DOMPDF_CACHE_DIR_DEFAULT . '/fonts';
     }
+    else if (basename($print_pdf_pdf_tool) == 'Dompdf.php') {
+      $pdf_dirs[] = PRINT_PDF_DOMPDF_CACHE_DIR_DEFAULT . '/fonts';
+    }
     elseif (basename($print_pdf_pdf_tool) == 'tcpdf.php') {
       foreach (array('cache', 'images') as $dir) {
         $pdf_dirs[] = PRINT_PDF_TCPDF_CACHE_DIR_DEFAULT . '/' . $dir;
@@ -218,7 +221,25 @@ function print_pdf_requirements($phase) {
             'severity' => REQUIREMENT_ERROR,
           );
         }
-        elseif (basename($print_pdf_pdf_tool) == 'dompdf_config.inc.php') {
+        elseif (basename($print_pdf_pdf_tool) == 'dompdf_config.inc.php' || basename($print_pdf_pdf_tool) == 'Dompdf.php') {
+          $version = _print_pdf_dompdf_version();
+          $min_version = '0.8.2';
+
+          if (version_compare($version, $min_version, '<')) {
+            $requirements['print_pdf_tool'] = array(
+              'title' => $t('Printer, email and PDF versions - PDF generation library'),
+              'value' => $t('Unsupported Dompdf version'),
+              'description' => $t('The currently selected version of Dompdf (@version) is not supported. Please update to !url.', array('@version' => $version, '!url' => l($t('version @min or higher', array('@min' => $min_version)), 'https://github.com/dompdf/dompdf/releases'))),
+              'severity' => REQUIREMENT_ERROR,
+            );
+          }
+          else {
+            $requirements['print_pdf_tool'] = array(
+              'title' => $t('Printer, email and PDF versions - PDF generation library'),
+              'value' => $t('Dompdf') . ' ' . $version,
+            );
+          }
+
           if (variable_get('print_pdf_autoconfig', PRINT_PDF_AUTOCONFIG_DEFAULT)) {
             $directory = file_directory_path() . '/' . PRINT_PDF_DOMPDF_CACHE_DIR_DEFAULT . '/fonts';
             if (!is_dir($directory) || !is_writable($directory)) {
@@ -635,6 +656,56 @@ function print_pdf_link_allowed($args) {
     return _print_page_match($print_pdf_sys_link_visibility, $_GET['q'], $print_pdf_sys_link_pages);
   }
   return FALSE;
+}
+
+/**
+ * Find out the version of the dompdf library
+ */
+function _print_pdf_dompdf_version() {
+  $print_pdf_pdf_tool = variable_get('print_pdf_pdf_tool', PRINT_PDF_PDF_TOOL_DEFAULT);
+  if (file_exists($print_pdf_pdf_tool)) {
+    include_once($print_pdf_pdf_tool);
+  }
+
+  if (basename($print_pdf_pdf_tool) == 'Dompdf.php') {
+    $dompdf_base = dirname(dirname($print_pdf_pdf_tool));
+    $version_file = $dompdf_base . '/VERSION';
+    if (file_exists($version_file)) {
+      // From 0.7.0 beta 3 onwards, there's a VERSION file.
+      return file_get_contents($version_file);
+    }
+    elseif (basename(dirname($print_pdf_pdf_tool)) === 'src') {
+      // The dompdf tool started using PSR-4 in 0.7.0 beta 2.
+      return '0.7.0 beta 2';
+    }
+    elseif (basename(dirname($print_pdf_pdf_tool)) === 'Dompdf') {
+      // In 0.7.0 beta 1, it was src/Dompdf/Dompdf.php.
+      return '0.7.0 beta 1';
+    }
+  }
+  else {
+    // Poor man's way to find dompdf version pre 0.7.
+    if (defined('DOMPDF_ENABLE_AUTOLOAD')) {
+      // It is not possible to tell apart 0.6.0, 0.6.1 or 0.6.2.
+      return '0.6.0, or higher';
+    }
+    elseif (defined('DOMPDF_ADMIN_USERNAME')) {
+      return '0.6.0 beta3';
+    }
+    elseif (defined('DOMPDF_LOG_OUTPUT_FILE')) {
+      return '0.6.0 beta2';
+    }
+    elseif (defined('DOMPDF_FONT_CACHE')) {
+      return '0.6.0 beta1';
+    }
+    elseif (defined('DOMPDF_CHROOT')) {
+      return '0.5.2';
+    }
+    elseif (defined('DOMPDF_DIR')) {
+      return '0.5.1';
+    }
+  }
+  return 'unknown';
 }
 
 /**
