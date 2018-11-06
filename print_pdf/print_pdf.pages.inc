@@ -192,9 +192,9 @@ function _print_pdf_dompdf($print, $html, $filename = NULL) {
   $unicode = variable_get('print_pdf_dompdf_unicode', PRINT_PDF_DOMPDF_UNICODE_DEFAULT);
   $font_subsetting = variable_get('print_pdf_dompdf_font_subsetting', PRINT_PDF_DOMPDF_FONT_SUBSETTING_DEFAULT);
   $font_cache = file_directory_path() . '/' . PRINT_PDF_DOMPDF_CACHE_DIR_DEFAULT . '/fonts/';
-
-  if (basename($print_pdf_pdf_tool) == 'dompdf_config.inc.php') {
-    // Version of dompdf is < 0.7.
+  
+  if (version_compare($version, '0.7', '<')) {
+    // Version of dompdf is 0.6.* or 0.5.*.
     if (variable_get('print_pdf_autoconfig', PRINT_PDF_AUTOCONFIG_DEFAULT)) {
       if (!defined('DOMPDF_ENABLE_PHP')) define("DOMPDF_ENABLE_PHP", FALSE);
       if (!defined('DOMPDF_ENABLE_REMOTE')) define("DOMPDF_ENABLE_REMOTE", TRUE);
@@ -234,11 +234,11 @@ function _print_pdf_dompdf($print, $html, $filename = NULL) {
     $dompdf->set_option('font_cache', $font_cache);
   }
 
-  // Try to use local file access for image files
-  $html = _print_pdf_file_access_images($html);
-
   // Remove all scripts due to security concerns.
   $html = preg_replace('!<script(.*?)>(.*?)</script>!is', '', $html);
+
+  // Try to use local file access for image files
+  $html = _print_pdf_file_access_images($html);
 
   // Spaces in img URLs must be replaced with %20
   $pattern = '!<(img\s[^>]*?)>!is';

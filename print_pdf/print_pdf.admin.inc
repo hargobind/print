@@ -186,7 +186,7 @@ function print_pdf_settings() {
       '#title' => t('Auto-configure the PDF tool settings'),
       '#default_value' => variable_get('print_pdf_autoconfig', PRINT_PDF_AUTOCONFIG_DEFAULT),
       '#description' => t('If you disable this option, the pdf tool settings must be configured manually. For TCDPF, edit the tcpdf/config/tcpdf_config.php file. For dompdf 0.6.2 and lower, edit the dompdf/dompdf_config.inc.php file.')
-        . ' ' . t('For dompdf 0.7 and higher, this option has no effect.'),
+        . ' ' . t('Dompdf 0.7 and higher does not rely on a config file.'),
     );
     $form['settings']['print_pdf_font_family'] = array(
       '#type' => 'textfield',
